@@ -1,0 +1,54 @@
+version: '3.9'
+
+services:
+  app:
+    build: ./docker/app
+    container_name: laravel_app
+    volumes:
+      - ./src:/var/www
+    working_dir: /var/www
+    depends_on:
+      - db
+
+  nginx:
+    image: nginx:latest
+    container_name: laravel_nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./src:/var/www
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
+
+  db:
+    image: mysql:8.4
+    container_name: laravel_db
+    restart: always
+    # 2026/04/08 森修正　MySQLの環境変数を別ファイルから読み込むように変更
+    #2026/04/08 森修正　MySQLのホスト側のポートを 3307 に変更
+    env_file:
+      - ./docker/db/mysql.env   # ← 追加：別ファイルから読み込む
+    ports:
+      - "3307:3306"             # ← 修正：ホスト側を 3307 に変更
+
+    # environment:
+    #   MYSQL_ROOT_PASSWORD: root
+    #   MYSQL_DATABASE: laravel
+    #   MYSQL_USER: laravel
+    #   MYSQL_PASSWORD: password
+    # ports:
+    #   - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+  node:
+    image: node:20
+    container_name: laravel_node
+    volumes:
+      - ./src:/var/www
+    working_dir: /var/www
+    tty: true
+
+volumes:
+  db_data:
