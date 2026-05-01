@@ -17,7 +17,7 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
-        // 1. バリデーション（入力チェック）
+        // バリデーション（入力チェック）
         // メールとパスワードが空でないか、正しい形式かチェック。
         $validator = Validator::make($request->all(), [
             'email'    => 'required|email',
@@ -31,11 +31,11 @@ class AuthController extends Controller
             ], 422); // 422 Unprocessable Entity (処理できないリクエスト)
         }
 
-        // 2. ユーザーの存在確認
+        // ユーザーの存在確認
         // 入力されたメールアドレスを持つユーザーをデータベースから探す。
         $user = User::where('email', $request->email)->first();
 
-        // 3. パスワードの確認
+        // パスワードの確認
         // 「ユーザーが存在しない」または「パスワードが一致しない」場合はエラー。
         if (! $user || ! Hash::check($request->password, $user->password)) {
             return response()->json([
@@ -43,11 +43,11 @@ class AuthController extends Controller
             ], 401); // 401 Unauthorized (認証失敗)
         }
 
-        // 4. 新しいトークンの発行
+        // 新しいトークンの発行
         // 次回からの通信用に新しいトークン（通行証）を発行。
         $token = $user->createToken('mobile')->plainTextToken;
 
-        // 5. 結果の返却
+        // 結果の返却
         // トークンとユーザー情報を返す。
         return response()->json([
             'message' => 'ログインに成功しました。',
