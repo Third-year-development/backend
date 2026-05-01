@@ -60,4 +60,35 @@ class User extends Authenticatable
     {
         return $this->hasMany(Whisper::class);
     }
+    /**
+     * 自分がフォローしているユーザー一覧のリレーショナル(n対n)
+     */
+    public function follows()
+    {
+        return $this->belongsToMany(User::class, 'follow_users', 'user_id', 'follow_user_id');
+    }
+
+    /**
+     * 自分をフォローしているユーザー一覧（フォロワー一覧）のリレーショナル(n対n)
+     */
+    public function followers()
+    {
+        return $this->belongsToMany(User::class, 'follow_users', 'follow_user_id', 'user_id');
+    }
+
+    /**
+     * 自分が引数のユーザーをすでにフォローしているか判定する
+     */
+public function isFollowing($userId)
+    {
+        return $this->follows()->where('follow_user_id', $userId)->exists();
+    }
+
+    /**
+     * ユーザーが「いいね」した投稿一覧のリレーショナル（n対n）
+     */
+    public function likedWhispers()
+    {
+        return $this->belongsToMany(Whisper::class, 'likes')->withTimestamps();
+    }
 }
