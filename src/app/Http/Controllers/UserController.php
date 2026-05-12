@@ -2,55 +2,133 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\User;
-use Illuminate\Support\Facades\Validator;
+use App\Models\UserProfile;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
 {
-    /**
-     * ユーザー登録処理（サインアップ）
-     * 
-     * 新規ユーザーを作成してデータベースへ保存。
-     * 登録と同時に認証トークンを発行。
-     */
-    public function register(Request $request)
+    public function register(Request $request): JsonResponse
     {
-        // バリデーション（入力チェック）
-        // 必須項目、メール形式、既存ユーザーとの重複を検証
         $validator = Validator::make($request->all(), [
-            'name'     => 'required',                     // 必須
-            'email'    => 'required|email|unique:users,email', // 必須、メール形式、usersテーブル内で一意
-            'password' => 'required|min:6'                // 必須、最低6文字
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|string|min:6',
         ]);
 
-        // エラー発生時の処理（HTTPステータス 422 でエラー内容を返却）
         if ($validator->fails()) {
             return response()->json([
-                'message' => 'バリデーションエラー',
-                'errors'  => $validator->errors()
+                'message' => 'Validation error.',
+                'errors' => $validator->errors(),
             ], 422);
         }
 
-        // ユーザーの作成
-        // usersテーブルへ新規レコードを保存
-        $user = User::create([
-            'name'     => $request->name,
-            'email'    => $request->email,
-            // セキュリティ対策のためパスワードをハッシュ化
-            'password' => Hash::make($request->password),
-        ]);
+        [$user, $token] = DB::transaction(function () use ($request): array {
+            $user = User::create([
+                'name' => $request->string('name')->toString(),
+                'email' => $request->string('email')->toString(),
+                'password' => Hash::make($request->string('password')->toString()),
+            ]);
 
-        // トークンの発行
-        // クライアントとの通信に使用するトークンを作成
-        $token = $user->createToken('mobile')->plainTextToken;
+            UserProfile::create([
+                'user_id' => $user->id,
+                'profile' => null,
+                'icon_file_name' => null,
+            ]);
 
-        // 処理結果の返却
-        // 作成成功（ステータス 201）とともに情報を返却
+            $token = $user->createToken('mobile')->plainTextToken;
+
+            return [$user->load('profile'), $token];
+        });
+
         return response()->json([
             'token' => $token,
-            'user'  => $user
+            'user' => $user,
         ], 201);
+    }
+
+    public function show(Request $request): JsonResponse
+    {
+        return response()->json([
+            'userprofile' => $request->user()->load('profile'),
+        ]);
+    }
+
+    public function update(Request $request, string $id): JsonResponse
+    {
+        $loginUser = $request->user();
+
+        if ((string) $loginUser->id !== $id) {
+            return response()->json([
+                'message' => 'You can only update your own user profile.',
+            ], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'profile' => 'nullable|string|max:255',
+            'iconfile' => 'nullable|file|image|max:5120',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation error.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        DB::transaction(function () use ($request, $loginUser): void {
+            $loginUser->update([
+                'name' => $request->string('name')->toString(),
+            ]);
+
+            $profile = $loginUser->profile ?? new UserProfile(['user_id' => $loginUser->id]);
+            $profile->user_id = $loginUser->id;
+            $profile->profile = $request->input('profile');
+
+            if ($request->hasFile('iconfile')) {
+                if ($profile->icon_file_name) {
+                    Storage::disk('public')->delete($profile->icon_file_name);
+                }
+
+                $profile->icon_file_name = $request->file('iconfile')->store('icons', 'public');
+            }
+
+            $profile->save();
+        });
+
+        return response()->json([
+            'userprofile' => $loginUser->fresh()->load('profile'),
+        ]);
+    }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        $loginUser = $request->user();
+
+        if ((string) $loginUser->id !== $id) {
+            return response()->json([
+                'message' => 'You can only delete your own user profile.',
+            ], 403);
+        }
+
+        DB::transaction(function () use ($loginUser): void {
+            $iconPath = $loginUser->profile?->icon_file_name;
+            if ($iconPath) {
+                Storage::disk('public')->delete($iconPath);
+            }
+
+            $loginUser->currentAccessToken()?->delete();
+            $loginUser->delete();
+        });
+
+        return response()->json([
+            'message' => 'User deleted.',
+        ]);
     }
 }
