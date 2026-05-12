@@ -4,70 +4,80 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\Whisper;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 
 class WhisperController extends Controller
 {
-    public function index()
+    public function index(Request $request): JsonResponse
     {
-        $user = Auth::user();
-        $followingIds = $user->follows()->pluck('users.id');
-        $followingIds->push($user->id);
+        $user = $request->user();
+        $followingIds = $user->follows()->pluck('users.id')->push($user->id)->unique()->values();
 
-        $whispers = Whisper::with('user')
+        $whispers = Whisper::with(['user.profile'])
             ->whereIn('user_id', $followingIds)
-            ->orderBy('created_at', 'desc')
+            ->orderByDesc('created_at')
             ->get();
 
-        return response()->json($whispers);
+        return response()->json([
+            'whisper' => $whispers,
+        ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'text' => 'required|string|max:255',
+        $validator = Validator::make($request->all(), [
+            'text' => 'required|string',
         ]);
 
-        Whisper::create([
-            'user_id' => Auth::id(),
-            'content' => $validated['text'],
-        ]);
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation error.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $whisper = Whisper::create([
+            'user_id' => $request->user()->id,
+            'content' => $request->string('text')->toString(),
+            'whisper_id' => null,
+        ])->load(['user.profile']);
 
         return response()->json([
             'message' => 'Whisper created.',
+            'whisper' => $whisper,
         ], 201);
     }
 
-    public function show(string $id)
+    public function show(string $id): JsonResponse
     {
-        $user = User::findOrFail($id);
-
-        $whispers = Whisper::where('user_id', $id)
-            ->orderBy('created_at', 'desc')
+        $user = User::with('profile')->findOrFail($id);
+        $whispers = Whisper::with(['user.profile'])
+            ->where('user_id', $user->id)
+            ->orderByDesc('created_at')
             ->get();
 
         return response()->json([
-            'user' => $user,
-            'whispers' => $whispers,
+            'userprofile' => $user,
+            'whisper' => $whispers,
         ]);
     }
 
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    public function destroy(string $id)
+    public function destroy(Request $request, string $id): JsonResponse
     {
         $whisper = Whisper::findOrFail($id);
 
-        if (Auth::id() !== $whisper->user_id) {
-            return response()->json(['message' => 'Forbidden.'], 403);
+        if ($whisper->user_id !== $request->user()->id) {
+            return response()->json([
+                'message' => 'You can only delete your own whisper.',
+            ], 403);
         }
 
         $whisper->delete();
 
-        return response()->json(['message' => 'Whisper deleted.']);
+        return response()->json([
+            'message' => 'Whisper deleted.',
+        ]);
     }
 }

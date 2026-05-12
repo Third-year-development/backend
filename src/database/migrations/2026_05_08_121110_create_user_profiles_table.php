@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('user_profiles', function (Blueprint $table) {
-            $table->foreignId('user_id')->primary()->constrained()->cascadeOnDelete();
-            $table->string('profile')->default('');
+            $table->id();
+            $table->foreignId('user_id')
+                ->unique()
+                ->constrained()
+                ->cascadeOnDelete();
+            $table->string('profile')->nullable();
             $table->string('icon_file_name')->nullable();
             $table->timestamps();
         });

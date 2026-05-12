@@ -4,19 +4,21 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\UserProfile;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
 {
-    public function register(Request $request)
+    public function register(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'name' => 'required',
+            'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
-            'password' => 'required|min:6',
+            'password' => 'required|string|min:6',
         ]);
 
         if ($validator->fails()) {
@@ -26,28 +28,107 @@ class UserController extends Controller
             ], 422);
         }
 
-        $user = DB::transaction(function () use ($request) {
+        [$user, $token] = DB::transaction(function () use ($request): array {
             $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
+                'name' => $request->string('name')->toString(),
+                'email' => $request->string('email')->toString(),
+                'password' => Hash::make($request->string('password')->toString()),
             ]);
 
             UserProfile::create([
                 'user_id' => $user->id,
-                'profile' => '',
+                'profile' => null,
                 'icon_file_name' => null,
             ]);
 
-            return $user;
-        });
+            $token = $user->createToken('mobile')->plainTextToken;
 
-        $token = $user->createToken('mobile')->plainTextToken;
-        $user->load('profile');
+            return [$user->load('profile'), $token];
+        });
 
         return response()->json([
             'token' => $token,
             'user' => $user,
         ], 201);
+    }
+
+    public function show(Request $request): JsonResponse
+    {
+        return response()->json([
+            'userprofile' => $request->user()->load('profile'),
+        ]);
+    }
+
+    public function update(Request $request, string $id): JsonResponse
+    {
+        $loginUser = $request->user();
+
+        if ((string) $loginUser->id !== $id) {
+            return response()->json([
+                'message' => 'You can only update your own user profile.',
+            ], 403);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|max:255',
+            'profile' => 'nullable|string|max:255',
+            'iconfile' => 'nullable|file|image|max:5120',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation error.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        DB::transaction(function () use ($request, $loginUser): void {
+            $loginUser->update([
+                'name' => $request->string('name')->toString(),
+            ]);
+
+            $profile = $loginUser->profile ?? new UserProfile(['user_id' => $loginUser->id]);
+            $profile->user_id = $loginUser->id;
+            $profile->profile = $request->input('profile');
+
+            if ($request->hasFile('iconfile')) {
+                if ($profile->icon_file_name) {
+                    Storage::disk('public')->delete($profile->icon_file_name);
+                }
+
+                $profile->icon_file_name = $request->file('iconfile')->store('icons', 'public');
+            }
+
+            $profile->save();
+        });
+
+        return response()->json([
+            'userprofile' => $loginUser->fresh()->load('profile'),
+        ]);
+    }
+
+    public function destroy(Request $request, string $id): JsonResponse
+    {
+        $loginUser = $request->user();
+
+        if ((string) $loginUser->id !== $id) {
+            return response()->json([
+                'message' => 'You can only delete your own user profile.',
+            ], 403);
+        }
+
+        DB::transaction(function () use ($loginUser): void {
+            $iconPath = $loginUser->profile?->icon_file_name;
+            if ($iconPath) {
+                Storage::disk('public')->delete($iconPath);
+            }
+
+            $loginUser->currentAccessToken()?->delete();
+            $loginUser->delete();
+        });
+
+        return response()->json([
+            'message' => 'User deleted.',
+        ]);
     }
 }

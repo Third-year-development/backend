@@ -4,6 +4,9 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -13,7 +16,7 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     /**
-     * 複数代入可能な属性（DBに保存・更新できるカラム）
+     * The attributes that are mass assignable.
      *
      * @var array<int, string>
      */
@@ -24,8 +27,7 @@ class User extends Authenticatable
     ];
 
     /**
-     * シリアライズ（配列やJSONに変換）する際に隠蔽する属性。
-     * パスワードなどがAPIのレスポンスに含まれないようにする。
+     * The attributes that should be hidden for serialization.
      *
      * @var array<int, string>
      */
@@ -35,8 +37,7 @@ class User extends Authenticatable
     ];
 
     /**
-     * キャスト（データ型の変換）を行う属性。
-     * 取得時や保存時に自動で指定の型に変換。
+     * The attributes that should be cast.
      *
      * @var array<string, string>
      */
@@ -45,50 +46,48 @@ class User extends Authenticatable
         'password' => 'hashed',
     ];
 
-    /**
-     * user_profilesテーブルとのリレーション 自分のプロフィールを取得するためのリレーション（1対1）
-     */
-    public function profile()
+    public function profile(): HasOne
     {
         return $this->hasOne(UserProfile::class);
     }
 
-    /**
-     * 自分の投稿（Whisper）一覧のリレーショナル（1対n）
-     */
-    public function whispers()
+    public function whispers(): HasMany
     {
         return $this->hasMany(Whisper::class);
     }
-    /**
-     * 自分がフォローしているユーザー一覧のリレーショナル(n対n)
-     */
-    public function follows()
+
+    public function follows(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'follow_users', 'user_id', 'follow_user_id');
+        return $this->belongsToMany(
+            self::class,
+            'follow_users',
+            'user_id',
+            'follow_user_id'
+        )->withTimestamps();
     }
 
-    /**
-     * 自分をフォローしているユーザー一覧（フォロワー一覧）のリレーショナル(n対n)
-     */
-    public function followers()
+    public function followers(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'follow_users', 'follow_user_id', 'user_id');
+        return $this->belongsToMany(
+            self::class,
+            'follow_users',
+            'follow_user_id',
+            'user_id'
+        )->withTimestamps();
     }
 
-    /**
-     * 自分が引数のユーザーをすでにフォローしているか判定する
-     */
-public function isFollowing($userId)
+    public function isFollowing(int $userId): bool
     {
-        return $this->follows()->where('follow_user_id', $userId)->exists();
+        return $this->follows()->where('users.id', $userId)->exists();
     }
 
-    /**
-     * ユーザーが「いいね」した投稿一覧のリレーショナル（n対n）
-     */
-    public function likedWhispers()
+    public function likedWhispers(): BelongsToMany
     {
-        return $this->belongsToMany(Whisper::class, 'likes')->withTimestamps();
+        return $this->belongsToMany(
+            Whisper::class,
+            'likes',
+            'user_id',
+            'whisper_id'
+        )->withTimestamps();
     }
 }
