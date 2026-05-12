@@ -8,10 +8,13 @@ use Illuminate\Database\Eloquent\Model;
 class UserProfile extends Model
 {
     use HasFactory;
-    // 主キーの関連付け
+
     protected $primaryKey = 'user_id';
 
-    // createメソッドで一括代入できるように配列を作成
+    public $incrementing = false;
+
+    protected $keyType = 'int';
+
     protected $fillable = [
         'user_id',
         'profile',
