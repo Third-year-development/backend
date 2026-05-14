@@ -6,22 +6,18 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Like extends Model
+class UserProfile extends Model
 {
     use HasFactory;
 
     protected $fillable = [
         'user_id',
-        'whisper_id',
+        'profile',
+        'icon_file_name',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function whisper(): BelongsTo
-    {
-        return $this->belongsTo(Whisper::class);
     }
 }

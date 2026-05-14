@@ -2,88 +2,75 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Models\User;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 
 class AuthController extends Controller
 {
-    //
-    public function login(Request $request)
+    public function login(Request $request): JsonResponse
     {
-        // ログイン処理の実装
-        // バリデーション（JSON で返す）
         $validator = Validator::make($request->all(), [
-            'email'    => 'required|email',
-            'password' => 'required'
+            'email' => 'required|email',
+            'password' => 'required',
         ]);
-        // バリデーションエラーの場合は JSON でエラーメッセージを返す
+
         if ($validator->fails()) {
             return response()->json([
-                'message' => 'バリデーションエラー',
-                'errors'  => $validator->errors()
+                'message' => 'Validation error.',
+                'errors' => $validator->errors(),
             ], 422);
         }
 
-        // 認証
         if (!Auth::attempt($request->only('email', 'password'))) {
             return response()->json([
-                'message' => 'ログイン情報が正しくありません'
+                'message' => 'Invalid login credentials.',
             ], 401);
         }
 
-        // 認証済みユーザー取得
         $user = Auth::user();
-
-        // トークン発行（モバイルアプリ用）
         $token = $user->createToken('mobile')->plainTextToken;
-
 
         return response()->json([
             'token' => $token,
-            'user'  => $user
+            'user' => $user->load('profile'),
         ], 200);
     }
 
-    public function logout(Request $request)
+    public function logout(Request $request): JsonResponse
     {
-        // ログアウト処理の実装
-        // 現在使用中のトークンだけ削除
         $token = $request->user()->currentAccessToken();
 
         if (!$token) {
             return response()->json([
-                'message' => '有効なトークンがありません'
+                'message' => 'No active token was found.',
             ], 400);
         }
 
         $token->delete();
 
         return response()->json([
-            'message' => 'ログアウトしました'
+            'message' => 'Logged out.',
         ], 200);
     }
 
-    public function register(Request $request)
+    public function register(Request $request): JsonResponse
     {
-        // ユーザー登録処理の実装
-        // 登録処理の実装
-        // バリデーション
         $validator = Validator::make($request->all(), [
-            'name'     => 'required',
-            'email'    => 'required|email|unique:users,email',
-            'password' => 'required|min:6'
+            'name' => 'required',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:6',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
-                'message' => 'バリデーションエラー',
-                'errors'  => $validator->errors()
+                'message' => 'Validation error.',
+                'errors' => $validator->errors(),
             ], 422);
         }
-
 
         $user = User::create([
             'name' => $request->name,
@@ -91,12 +78,11 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
         ]);
 
-        // トークン発行（モバイルアプリ用）
         $token = $user->createToken('mobile')->plainTextToken;
 
         return response()->json([
             'token' => $token,
-            'user'  => $user
+            'user' => $user,
         ], 201);
     }
 }
