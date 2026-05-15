@@ -52,10 +52,19 @@ class UserController extends Controller
         ], 201);
     }
 
+    /**
+     * ユーザー情報取得
+     *
+     * @param Request $request リクエストオブジェクト（ログインユーザー情報を含む）
+     * @return JsonResponse ユーザー情報とプロフィール情報のJSONレスポンス
+     */
     public function show(Request $request): JsonResponse
     {
+        // ログイン中のユーザー情報を取得し、関連するプロフィール情報も合わせて読み込む
+        $user = $request->user()->load('profile');
+
         return response()->json([
-            'userprofile' => $request->user()->load('profile'),
+            'userprofile' => $user,
         ]);
     }
 
