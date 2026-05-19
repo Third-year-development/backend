@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\SearchController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\WhisperController;
 use Illuminate\Support\Facades\Route;
@@ -20,6 +21,11 @@ Route::prefix('v1')->group(function () {
     Route::get('/user', [UserController::class, 'show'])->middleware('auth:sanctum');
 
     Route::middleware('auth:sanctum')->group(function () {
+        // 検索用ルート
+        Route::get('/search/users/{keyword}', [SearchController::class, 'usernameSearch']);
+        Route::get('/search/whispers/{keyword}', [SearchController::class, 'whisperSearch']);
+
+        // Whisper関連ルート
         Route::get('/whispers', [WhisperController::class, 'index']);
         Route::post('/whispers', [WhisperController::class, 'store']);
         Route::get('/user/whispers/{id}', [WhisperController::class, 'show']);

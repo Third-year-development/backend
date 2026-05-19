@@ -3,46 +3,45 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\User;
+use App\Models\Whisper;
+use Illuminate\Http\JsonResponse;
 
 class SearchController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * ユーザー名検索
+     * 引数のkeywordの内容を持つユーザー名を検索してその結果のユーザー一覧を返す
+     *
+     * @param string $keyword
+     * @return JsonResponse
      */
-    public function index()
+    public function usernameSearch(string $keyword): JsonResponse
     {
-        //
+        // ユーザー名にキーワードが含まれる(LIKE検索)ユーザーを取得
+        $users = User::where('name', 'like', "%{$keyword}%")->get();
+
+        return response()->json([
+            'users' => $users
+        ]);
     }
 
     /**
-     * Store a newly created resource in storage.
+     * ささやき本文検索
+     * 引数のkeywordの内容を持つささやきの本文を検索してその結果のささやき一覧を返す（日付の新しい順）
+     *
+     * @param string $keyword
+     * @return JsonResponse
      */
-    public function store(Request $request)
+    public function whisperSearch(string $keyword): JsonResponse
     {
-        //
-    }
+        // ささやきの本文にキーワードが含まれるものを検索し、作成日時の新しい順(降順)で取得
+        $whispers = Whisper::where('content', 'like', "%{$keyword}%")
+            ->orderBy('created_at', 'desc') // 日付の新しい順
+            ->get();
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        return response()->json([
+            'whispers' => $whispers
+        ]);
     }
 }
