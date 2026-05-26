@@ -75,6 +75,63 @@ class WhisperApiTest extends TestCase
         $response->assertJsonMissing(['content' => 'hidden whisper']);
     }
 
+    public function test_index_returns_liked_by_me_state(): void
+    {
+        $user = User::factory()->create();
+        $user->profile()->create(['profile' => null, 'icon_file_name' => null]);
+
+        $whisper = Whisper::create([
+            'user_id' => $user->id,
+            'content' => 'liked whisper',
+            'whisper_id' => null,
+        ]);
+        $user->likedWhispers()->attach($whisper->id);
+
+        Sanctum::actingAs($user);
+
+        $this->getJson('/api/v1/whispers')
+            ->assertOk()
+            ->assertJsonPath('whisper.0.liked_by_me', true)
+            ->assertJsonPath('whisper.0.liked_by_count', 1);
+    }
+
+    public function test_index_respects_limit(): void
+    {
+        $user = User::factory()->create();
+        $user->profile()->create(['profile' => null, 'icon_file_name' => null]);
+
+        Whisper::create(['user_id' => $user->id, 'content' => 'one', 'whisper_id' => null]);
+        Whisper::create(['user_id' => $user->id, 'content' => 'two', 'whisper_id' => null]);
+        Whisper::create(['user_id' => $user->id, 'content' => 'three', 'whisper_id' => null]);
+
+        Sanctum::actingAs($user);
+
+        $this->getJson('/api/v1/whispers?limit=2')
+            ->assertOk()
+            ->assertJsonCount(2, 'whisper');
+    }
+
+    public function test_show_returns_user_line_and_whispers(): void
+    {
+        $viewer = User::factory()->create();
+        $target = User::factory()->create();
+        $target->profile()->create(['profile' => 'target profile', 'icon_file_name' => null]);
+
+        Whisper::create([
+            'user_id' => $target->id,
+            'content' => 'target whisper',
+            'whisper_id' => null,
+        ]);
+
+        Sanctum::actingAs($viewer);
+
+        $this->getJson('/api/v1/user/whispers/'.$target->id)
+            ->assertOk()
+            ->assertJsonPath('user_line.id', $target->id)
+            ->assertJsonPath('user_line.profile.profile', 'target profile')
+            ->assertJsonFragment(['content' => 'target whisper']);
+    }
+
     public function test_destroy_uses_post_route(): void
     {
         $user = User::factory()->create();
@@ -98,6 +155,27 @@ class WhisperApiTest extends TestCase
             ->assertJsonPath('message', 'Whisper deleted.');
 
         $this->assertDatabaseMissing('whispers', [
+            'id' => $whisper->id,
+        ]);
+    }
+
+    public function test_destroy_rejects_other_users_whisper(): void
+    {
+        $user = User::factory()->create();
+        $other = User::factory()->create();
+
+        $whisper = Whisper::create([
+            'user_id' => $other->id,
+            'content' => 'not yours',
+            'whisper_id' => null,
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->postJson('/api/v1/whispers/'.$whisper->id)
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('whispers', [
             'id' => $whisper->id,
         ]);
     }

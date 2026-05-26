@@ -49,13 +49,16 @@ class UserController extends Controller
         return response()->json([
             'token' => $token,
             'user' => $user,
+            'userprofile' => $user,
         ], 201);
     }
 
     public function show(Request $request): JsonResponse
     {
         return response()->json([
-            'userprofile' => $request->user()->load('profile'),
+            'userprofile' => $request->user()
+                ->load('profile')
+                ->loadCount(['follows', 'followers']),
         ]);
     }
 
@@ -102,8 +105,13 @@ class UserController extends Controller
             $profile->save();
         });
 
+        $user = $loginUser->fresh()
+            ->load('profile')
+            ->loadCount(['follows', 'followers']);
+
         return response()->json([
-            'userprofile' => $loginUser->fresh()->load('profile'),
+            'user' => $user,
+            'userprofile' => $user,
         ]);
     }
 
