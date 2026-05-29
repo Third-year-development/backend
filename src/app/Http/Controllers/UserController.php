@@ -29,10 +29,13 @@ class UserController extends Controller
         }
 
         [$user, $token] = DB::transaction(function () use ($request): array {
+
             $user = User::create([
                 'name' => $request->string('name')->toString(),
                 'email' => $request->string('email')->toString(),
-                'password' => Hash::make($request->string('password')->toString()),
+                'password' => Hash::make(
+                    $request->string('password')->toString()
+                ),
             ]);
 
             UserProfile::create([
@@ -86,20 +89,27 @@ class UserController extends Controller
         }
 
         DB::transaction(function () use ($request, $loginUser): void {
+
             $loginUser->update([
                 'name' => $request->string('name')->toString(),
             ]);
 
-            $profile = $loginUser->profile ?? new UserProfile(['user_id' => $loginUser->id]);
+            $profile = $loginUser->profile
+                ?? new UserProfile(['user_id' => $loginUser->id]);
+
             $profile->user_id = $loginUser->id;
             $profile->profile = $request->input('profile');
 
             if ($request->hasFile('iconfile')) {
+
                 if ($profile->icon_file_name) {
-                    Storage::disk('public')->delete($profile->icon_file_name);
+                    Storage::disk('public')
+                        ->delete($profile->icon_file_name);
                 }
 
-                $profile->icon_file_name = $request->file('iconfile')->store('icons', 'public');
+                $profile->icon_file_name = $request
+                    ->file('iconfile')
+                    ->store('icons', 'public');
             }
 
             $profile->save();
@@ -126,17 +136,34 @@ class UserController extends Controller
         }
 
         DB::transaction(function () use ($loginUser): void {
+
             $iconPath = $loginUser->profile?->icon_file_name;
+
             if ($iconPath) {
                 Storage::disk('public')->delete($iconPath);
             }
 
             $loginUser->currentAccessToken()?->delete();
+
             $loginUser->delete();
         });
 
         return response()->json([
             'message' => 'User deleted.',
+        ]);
+    }
+
+    public function search(Request $request): JsonResponse
+    {
+        $keyword = $request->query('keyword');
+
+        $users = User::where('name', 'LIKE', "%{$keyword}%")
+            ->select('id', 'name')
+            ->limit(20)
+            ->get();
+
+        return response()->json([
+            'users' => $users,
         ]);
     }
 }
