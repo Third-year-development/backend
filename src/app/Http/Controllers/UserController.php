@@ -166,4 +166,17 @@ class UserController extends Controller
             'users' => $users,
         ]);
     }
+
+    public function followers(string $id): JsonResponse
+    {
+        $user = User::findOrFail($id);
+
+        $followers = $user->followers()
+            ->select('users.id', 'users.name')
+            ->get();
+
+        return response()->json([
+            'followers' => $followers,
+        ]);
+    }
 }
