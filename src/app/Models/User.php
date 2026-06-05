@@ -81,6 +81,15 @@ class User extends Authenticatable
         return $this->follows()->where('users.id', $userId)->exists();
     }
 
+    /**
+     * このユーザーが「いいね」したささやき一覧のリレーション（n対n）
+     *
+     * likesテーブルを中間テーブルとして、users と whispers を多対多で紐づけ。
+     * - 第1引数: 関連先モデル（Whisper）
+     * - 第2引数: 中間テーブル名（likes）
+     * - 第3引数: 自分側の外部キー（user_id）
+     * - 第4引数: 相手側の外部キー（whisper_id）
+     */
     public function likedWhispers(): BelongsToMany
     {
         return $this->belongsToMany(
