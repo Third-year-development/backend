@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Models\UserProfile;
+use App\Models\Whisper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -177,6 +178,23 @@ class UserController extends Controller
 
         return response()->json([
             'followers' => $followers,
+        ]);
+    }
+
+    public function timeline(Request $request): JsonResponse
+    {
+        $loginUser = $request->user();
+
+        $followIds = $loginUser->follows()
+            ->pluck('users.id');
+
+        $whispers = Whisper::with('user')
+            ->whereIn('user_id', $followIds)
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'whispers' => $whispers,
         ]);
     }
 }
