@@ -33,6 +33,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/search/whispers/{keyword}', [SearchController::class, 'whisperSearch']);
         Route::get('/following', [FollwerController::class, 'following']);
         Route::get('/followers', [FollwerController::class, 'followers']);
+        Route::get('/user/following/{id}', [FollwerController::class, 'followingById']);
+        Route::get('/user/followers/{id}', [FollwerController::class, 'followersById']);
         Route::post('/followcheck', [RegistrationController::class, 'followRegister']);
         Route::post('/likecheck', [RegistrationController::class, 'likeRegister']);
     });
