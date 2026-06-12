@@ -88,6 +88,21 @@ class WhisperController extends Controller
         ]);
     }
 
+    public function likedByUser(Request $request, string $id): JsonResponse
+    {
+        $target = User::findOrFail($id);
+        $whispers = $target->likedWhispers()
+            ->with(['user.profile'])
+            ->withCount('likedBy')
+            ->orderByDesc('likes.created_at')
+            ->limit($this->limit($request))
+            ->get();
+
+        return response()->json([
+            'whisper' => $this->withViewerStates($whispers, $request->user()->id),
+        ]);
+    }
+
     public function destroy(Request $request, string $id): JsonResponse
     {
         $whisper = Whisper::findOrFail($id);

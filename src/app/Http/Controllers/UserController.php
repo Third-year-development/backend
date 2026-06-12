@@ -68,8 +68,11 @@ class UserController extends Controller
             ->withCount(['follows', 'followers'])
             ->findOrFail($id);
 
+        $isFollowing = $request->user()->isFollowing((int) $id);
+
         return response()->json([
             'userprofile' => $user,
+            'is_following' => $isFollowing,
         ]);
     }
 

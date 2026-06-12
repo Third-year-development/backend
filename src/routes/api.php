@@ -35,6 +35,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/followers', [FollwerController::class, 'followers']);
         Route::get('/user/following/{id}', [FollwerController::class, 'followingById']);
         Route::get('/user/followers/{id}', [FollwerController::class, 'followersById']);
+        Route::get('/user/likes/{id}', [WhisperController::class, 'likedByUser']);
         Route::post('/followcheck', [RegistrationController::class, 'followRegister']);
         Route::post('/likecheck', [RegistrationController::class, 'likeRegister']);
     });
