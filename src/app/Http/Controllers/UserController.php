@@ -152,18 +152,4 @@ class UserController extends Controller
             'message' => 'User deleted.',
         ]);
     }
-
-    public function search(Request $request): JsonResponse
-    {
-        $keyword = $request->query('keyword');
-
-        $users = User::where('name', 'LIKE', "%{$keyword}%")
-            ->select('id', 'name')
-            ->limit(20)
-            ->get();
-
-        return response()->json([
-            'users' => $users,
-        ]);
-    }
 }
