@@ -16,8 +16,8 @@ class WhisperController extends Controller
         $user = $request->user();
         $followingIds = $user->follows()->pluck('users.id')->push($user->id)->unique()->values();
 
-        $whispers = Whisper::with(['user.profile'])
-            ->withCount('likedBy')
+        $whispers = Whisper::with(['user.profile', 'parent.user.profile'])
+            ->withCount(['likedBy', 'retweets'])
             ->whereIn('user_id', $followingIds)
             ->orderByDesc('created_at')
             ->limit($this->limit($request))
@@ -32,8 +32,8 @@ class WhisperController extends Controller
     {
         $user = $request->user();
 
-        $whispers = Whisper::with(['user.profile'])
-            ->withCount('likedBy')
+        $whispers = Whisper::with(['user.profile', 'parent.user.profile'])
+            ->withCount(['likedBy', 'retweets'])
             ->orderByDesc('created_at')
             ->limit($this->limit($request))
             ->get();
@@ -61,7 +61,7 @@ class WhisperController extends Controller
             'content' => $request->string('text')->toString(),
             'whisper_id' => null,
         ])->load(['user.profile'])
-            ->loadCount('likedBy');
+            ->loadCount(['likedBy', 'retweets']);
 
         return response()->json([
             'message' => 'Whisper created.',
@@ -74,8 +74,8 @@ class WhisperController extends Controller
         $user = User::with('profile')
             ->withCount(['follows', 'followers'])
             ->findOrFail($id);
-        $whispers = Whisper::with(['user.profile'])
-            ->withCount('likedBy')
+        $whispers = Whisper::with(['user.profile', 'parent.user.profile'])
+            ->withCount(['likedBy', 'retweets'])
             ->where('user_id', $user->id)
             ->orderByDesc('created_at')
             ->limit($this->limit($request))
@@ -92,14 +92,43 @@ class WhisperController extends Controller
     {
         $target = User::findOrFail($id);
         $whispers = $target->likedWhispers()
-            ->with(['user.profile'])
-            ->withCount('likedBy')
+            ->with(['user.profile', 'parent.user.profile'])
+            ->withCount(['likedBy', 'retweets'])
             ->orderByDesc('likes.created_at')
             ->limit($this->limit($request))
             ->get();
 
         return response()->json([
             'whisper' => $this->withViewerStates($whispers, $request->user()->id),
+        ]);
+    }
+
+    public function retweet(Request $request, string $id): JsonResponse
+    {
+        $original = Whisper::findOrFail($id);
+        $user = $request->user();
+
+        $existing = Whisper::where('user_id', $user->id)
+            ->where('whisper_id', $original->id)
+            ->first();
+
+        if ($existing) {
+            $existing->delete();
+            $retweeted = false;
+        } else {
+            Whisper::create([
+                'user_id' => $user->id,
+                'content' => '',
+                'whisper_id' => $original->id,
+            ]);
+            $retweeted = true;
+        }
+
+        $retweetCount = Whisper::where('whisper_id', $original->id)->count();
+
+        return response()->json([
+            'retweeted' => $retweeted,
+            'retweet_count' => $retweetCount,
         ]);
     }
 
@@ -128,15 +157,36 @@ class WhisperController extends Controller
     private function withViewerStates(Collection $whispers, int $viewerId): Collection
     {
         $ids = $whispers->pluck('id');
+        $parentIds = $whispers->pluck('whisper_id')->filter()->values();
+        $allIds = $ids->merge($parentIds)->unique();
+
+        // いいね状態
         $likedIds = User::findOrFail($viewerId)
             ->likedWhispers()
-            ->whereIn('whispers.id', $ids)
+            ->whereIn('whispers.id', $allIds)
             ->pluck('whispers.id')
             ->flip();
 
-        return $whispers->map(function (Whisper $whisper) use ($likedIds): array {
+        // リツイート状態（自分がリツイートしているささやきのID）
+        $retweetedIds = Whisper::where('user_id', $viewerId)
+            ->whereNotNull('whisper_id')
+            ->whereIn('whisper_id', $allIds)
+            ->pluck('whisper_id')
+            ->flip();
+
+        return $whispers->map(function (Whisper $whisper) use ($likedIds, $retweetedIds): array {
             $data = $whisper->toArray();
             $data['liked_by_me'] = $likedIds->has($whisper->id);
+            $data['retweeted_by_me'] = $retweetedIds->has($whisper->id);
+
+            // リツイートの場合、親ささやきにも viewer states を付与
+            if (isset($data['parent']) && $whisper->whisper_id) {
+                $pid = $whisper->whisper_id;
+                $data['parent']['liked_by_me'] = $likedIds->has($pid);
+                $data['parent']['retweeted_by_me'] = $retweetedIds->has($pid);
+                $data['parent']['liked_by_count'] = $data['parent']['liked_by_count'] ?? 0;
+                $data['parent']['retweets_count'] = $data['parent']['retweets_count'] ?? 0;
+            }
 
             return $data;
         });

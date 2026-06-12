@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Whisper extends Model
 {
@@ -31,6 +32,11 @@ class Whisper extends Model
     {
         return $this->belongsToMany(User::class, 'likes')
             ->withTimestamps();
+    }
+
+    public function retweets(): HasMany
+    {
+        return $this->hasMany(self::class, 'whisper_id');
     }
 
     public function getLikesCountAttribute(): int
