@@ -62,6 +62,17 @@ class UserController extends Controller
         ]);
     }
 
+    public function showById(Request $request, string $id): JsonResponse
+    {
+        $user = User::with('profile')
+            ->withCount(['follows', 'followers'])
+            ->findOrFail($id);
+
+        return response()->json([
+            'userprofile' => $user,
+        ]);
+    }
+
     public function update(Request $request, string $id): JsonResponse
     {
         $loginUser = $request->user();

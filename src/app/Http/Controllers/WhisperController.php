@@ -28,6 +28,21 @@ class WhisperController extends Controller
         ]);
     }
 
+    public function all(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $whispers = Whisper::with(['user.profile'])
+            ->withCount('likedBy')
+            ->orderByDesc('created_at')
+            ->limit($this->limit($request))
+            ->get();
+
+        return response()->json([
+            'whisper' => $this->withViewerStates($whispers, $user->id),
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [

@@ -21,9 +21,11 @@ Route::prefix('v1')->group(function () {
     });
 
     Route::get('/user', [UserController::class, 'show'])->middleware('auth:sanctum');
+    Route::get('/users/{id}', [UserController::class, 'showById'])->middleware('auth:sanctum');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('/whispers', [WhisperController::class, 'index']);
+        Route::get('/whispers/all', [WhisperController::class, 'all']);
         Route::post('/whispers', [WhisperController::class, 'store']);
         Route::get('/user/whispers/{id}', [WhisperController::class, 'show']);
         Route::post('/whispers/{id}', [WhisperController::class, 'destroy']);
